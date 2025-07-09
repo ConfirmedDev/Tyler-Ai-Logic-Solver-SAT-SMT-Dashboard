@@ -65,7 +65,7 @@ Self-taught developer, logic engineer, and creative technologist.
 
 ## 🧠 Summary
 
-This project was designed to serve as a research-grade symbolic reasoning dashboard that helps others explore the bridge between computational logic and interactive visualization. Built from scratch without formal training — proof that deep curiosity and discipline go a long way.
+This project was designed to serve as a research-grade symbolic reasoning dashboard that helps others explore the bridge between computational logic and interactive visualization.
 
 ---
 
