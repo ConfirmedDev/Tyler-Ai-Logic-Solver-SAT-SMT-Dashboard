@@ -58,10 +58,8 @@ Want help adding screenshots or GIFs of your solver UI, CNF matrix, implication 
 ## 👨‍💻 Built By
 
 **Tyler Smith**  
-Self-taught developer, logic engineer, and creative technologist.  
-📫 [Email Me](smithtyler09239.com)  
+Self-taught developer, logic engineer, and creative technologist.   
 🔗 [GitHub Profile](https://github.com/ConfirmedDev) 
-🔗 [Portfolio](https://yourportfolio.com)
 
 ---
 
