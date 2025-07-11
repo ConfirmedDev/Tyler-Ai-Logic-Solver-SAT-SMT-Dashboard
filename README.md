@@ -38,12 +38,6 @@ An interactive symbolic reasoning platform built from the ground up using Python
 
 ---
 
-## 📸 Screenshots (Coming Soon)
-
-Want help adding screenshots or GIFs of your solver UI, CNF matrix, implication graph, or Turing machine simulation? I can help format that next.
-
----
-
 ## 🧪 Planned Features
 
 - Save/load session (JSON/CNF)
