@@ -1,5 +1,5 @@
 # 🧠 Tyler AI Logic Solver - SAT + SMT Dashboard
-
+https://tyler-ai-logic-solver-sat-smt-dashboard.onrender.com
 An interactive symbolic reasoning platform built from the ground up using Python, Z3, and Flask — designed to help visualize and understand formal logic, SAT problems, and SMT solving in a creative and educational way.
 
 ---
