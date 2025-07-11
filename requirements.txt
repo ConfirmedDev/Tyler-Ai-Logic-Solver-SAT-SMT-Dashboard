@@ -1,0 +1,9 @@
+
+Requirements:
+flask
+z3-solver
+gunicorn
+
+
+requirements To create it in Ubuntu WSL or VS Code terminal:
+echo -e "flask\nz3-solver\ngunicorn" 

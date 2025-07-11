@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Tyler's Theory - Collatz Clause Reducer & 2-SAT Reducer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 700px;
+            margin: auto;
+            padding: 20px;
+        }
+        textarea, button {
+            width: 100%;
+            margin-top: 10px;
+            padding: 10px;
+            font-size: 1em;
+            box-sizing: border-box;
+        }
+        pre {
+            background: #f9f9f9;
+            padding: 10px;
+            white-space: pre-wrap;
+            margin-top: 10px;
+            border: 1px solid #ddd;
+        }
+        section {
+            margin-bottom: 40px;
+            border: 1px solid #ccc;
+            padding: 15px;
+            border-radius: 5px;
+            background: #fff;
+        }
+        h2 {
+            margin-top: 0;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin-top: 10px;
+        }
+        table, th, td {
+            border: 1px solid #ccc;
+        }
+        th, td {
+            padding: 6px;
+            text-align: center;
+        }
+        #graphContainer {
+            height: 400px;
+            border: 1px solid #ccc;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧠 Tyler's Theory</h1>
+
+    <section id="collatzClauseReducerSection">
+        <h2>1. Collatz Clause Reducer (3-SAT → 2-SAT style)</h2>
+        <p>Enter SAT clauses (one clause per line, literals space-separated):</p>
+        <textarea id="clausesInput" rows="8" placeholder="x1 !x2 x3\n!x1 x2 !x3\nx2 !x4 x5"></textarea>
+        <button id="btnReduce3Sat">Run Collatz Clause Reducer</button>
+        <div id="output"></div>
+    </section>
+
+    <section id="collatz2SatReducerSection">
+        <h2>2. Collatz 2-SAT → SAT Check</h2>
+        <p>Auto-filled from 3-SAT reduction:</p>
+        <textarea id="twoSatInput" rows="6"></textarea>
+        <button id="btnReduce2Sat">Run 2-SAT Reducer (SAT/UNSAT)</button>
+        <h3>Logs:</h3>
+        <pre id="twoSatLogs"></pre>
+        <h3>Result:</h3>
+        <pre id="oneSatOutput"></pre>
+    </section>
+
+    <section id="visualizationSection">
+        <h2>3. CNF Clause Matrix & Implication Graph Visualizer</h2>
+        <button id="btnVisualize">Visualize 2-SAT Input</button>
+
+        <h3>Clause-Literal Matrix</h3>
+        <div id="matrixContainer" style="overflow-x:auto;"></div>
+
+        <h3>Implication Graph</h3>
+        <div id="graphContainer"></div>
+    </section>
+
+    <section>
+        <h2>4. Benchmark a DIMACS .cnf File</h2>
+        <p>Use curl or Python fetch to call this backend endpoint:</p>
+        <pre>
+curl -X POST http://localhost:5000/run_tyler_benchmark \
+  -H "Content-Type: application/json" \
+  -d '{"file_path": "/absolute/path/to/file.cnf"}'
+        </pre>
+    </section>
+
+    <a href="/" style="display:block; margin-top:30px;">← Back to Main Dashboard</a>
+
+    <!-- Vis.js CDN -->
+    <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        document.getElementById('btnReduce3Sat').onclick = async () => {
+            const raw = document.getElementById('clausesInput').value.trim();
+            if (!raw) {
+                alert('Please enter some clauses.');
+                return;
+            }
+            const clauses = raw.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+
+            const res = await fetch('/tyler_collatz_clause_reducer', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ clauses })
+            });
+            const data = await res.json();
+
+            let html = '<h3>Logs:</h3><pre>' + data.logs.join('\n') + '</pre>';
+            html += '<h3>Reduced Clauses:</h3><pre>' + data.reduced_clauses.join('\n') + '</pre>';
+            html += `<p><strong>Reducer Time:</strong> ${data.reducer_time} seconds</p>`;
+            document.getElementById('output').innerHTML = html;
+
+            document.getElementById('twoSatInput').value = data.reduced_clauses.join('\n');
+            document.getElementById('twoSatLogs').textContent = '';
+            document.getElementById('oneSatOutput').textContent = '';
+            document.getElementById('matrixContainer').innerHTML = '';
+            document.getElementById('graphContainer').innerHTML = '';
+        };
+
+        document.getElementById('btnReduce2Sat').onclick = async () => {
+            const raw = document.getElementById('twoSatInput').value.trim();
+            if (!raw) {
+                alert('Please enter 2-SAT clauses.');
+                return;
+            }
+            const clauses = raw.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+
+            document.getElementById('twoSatLogs').textContent = 'Checking...';
+            document.getElementById('oneSatOutput').textContent = '';
+
+            try {
+                const res = await fetch('/tyler_collatz_2sat_reducer', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ clauses })
+                });
+                const data = await res.json();
+
+                document.getElementById('twoSatLogs').textContent = data.logs.join('\n');
+                document.getElementById('oneSatOutput').textContent = 
+                    `${data.result === 'SAT' ? '✅ SAT' : '❌ UNSAT'} (Time: ${data.twosat_time} seconds)`;
+
+            } catch (e) {
+                document.getElementById('twoSatLogs').textContent = 'Error: ' + e.message;
+            }
+        };
+
+        document.getElementById('btnVisualize').onclick = async () => {
+            const raw = document.getElementById('twoSatInput').value.trim();
+            if (!raw) {
+                alert('Please enter 2-SAT clauses to visualize.');
+                return;
+            }
+            const clauses = raw.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+
+            try {
+                const res = await fetch('/get_implication_graph', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ clauses })
+                });
+                const data = await res.json();
+
+                renderGraph(data.nodes, data.edges);
+                renderMatrix(data.literals, data.matrix || []);
+            } catch (err) {
+                alert('Error visualizing graph: ' + err.message);
+            }
+        };
+
+        function renderMatrix(literals, matrix) {
+            let html = '<table><thead><tr><th>Clause \\ Literal</th>';
+            literals.forEach(lit => html += `<th>${lit}</th>`);
+            html += '</tr></thead><tbody>';
+
+            matrix.forEach((row, i) => {
+                html += `<tr><td>Clause ${i}</td>`;
+                row.forEach(val => {
+                    let cell = '';
+                    if (val === 1) cell = '✔️';
+                    else if (val === -1) cell = '❌';
+                    html += `<td>${cell}</td>`;
+                });
+                html += '</tr>';
+            });
+
+            html += '</tbody></table>';
+            document.getElementById('matrixContainer').innerHTML = html;
+        }
+
+        function renderGraph(nodes, edges) {
+            const container = document.getElementById('graphContainer');
+            const data = {
+                nodes: new vis.DataSet(nodes),
+                edges: new vis.DataSet(edges)
+            };
+            const options = {
+                layout: { hierarchical: false },
+                edges: { arrows: 'to' },
+                physics: { stabilization: true, barnesHut: { avoidOverlap: 1 } }
+            };
+            container.innerHTML = '';
+            new vis.Network(container, data, options);
+        }
+    });
+    </script>
+</body>
+</html>
+

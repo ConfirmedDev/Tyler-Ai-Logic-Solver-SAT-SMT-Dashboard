@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SAT + SMT Solver Dashboard</title>
+
+<style>
+  /* General page styling */
+  body {
+    font-family: Arial, sans-serif;
+    margin: 20px;
+    max-width: 1000px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  h1 {
+    text-align: center;
+    margin-bottom: 40px;
+  }
+
+  section {
+    margin-bottom: 40px;
+    padding: 15px 20px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    background: #fafafa;
+  }
+
+  textarea, input[type="text"], input[type="number"] {
+    width: 100%;
+    font-family: monospace;
+    font-size: 1rem;
+    margin: 6px 0 12px 0;
+    padding: 8px;
+    border: 1px solid #bbb;
+    border-radius: 4px;
+    box-sizing: border-box;
+  }
+
+  textarea[readonly] {
+    background-color: #eee;
+  }
+
+  button {
+    background-color: #4a90e2;
+    border: none;
+    color: white;
+    padding: 10px 16px;
+    font-size: 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+  }
+  button:hover {
+    background-color: #357ABD;
+  }
+
+  pre {
+    background: #f7f7f7;
+    border: 1px solid #ddd;
+    padding: 12px;
+    white-space: pre-wrap;
+    font-family: monospace;
+    max-height: 180px;
+    overflow-y: auto;
+    border-radius: 4px;
+    margin-top: 6px;
+  }
+
+  /* Table styling for CNF Matrix */
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin-top: 12px;
+  }
+  th, td {
+    border: 1px solid #999;
+    padding: 6px 10px;
+    text-align: center;
+    font-family: monospace;
+    user-select: none;
+  }
+  th {
+    background-color: #4a90e2;
+    color: white;
+  }
+  td.checked {
+    background-color: #c8f7c5;
+    font-weight: bold;
+    color: #2a7a2a;
+  }
+  td.clause-label {
+    font-weight: bold;
+    background-color: #e8f0fe;
+    cursor: default;
+  }
+
+  /* Container for implication graph */
+  #implicationGraph {
+    height: 450px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    margin-top: 12px;
+    background-color: white;
+  }
+
+  /* Responsive tweaks */
+  @media (max-width: 600px) {
+    button {
+      width: 100%;
+      margin-bottom: 12px;
+    }
+  }
+</style>
+
+<!-- Vis-network library for graph visualization -->
+<script src="https://unpkg.com/vis-network@9.1.2/dist/vis-network.min.js"></script>
+</head>
+
+<body>
+<h1>SAT + SMT Solver Dashboard</h1>
+
+<!-- 3-SAT to 2-SAT Reducer -->
+<section id="reduce3sat">
+  <h2>3-SAT → 2-SAT Reducer</h2>
+  <textarea id="input3sat" placeholder="Enter 3-SAT clauses, one per line. Example:&#10;x1 !x2 x3&#10;!x1 x2 !x3"></textarea><br/>
+  <button onclick="reduce3sat()">Reduce 3-SAT</button>
+  <h3>Reduction Logs:</h3>
+  <pre id="reduceLogs" aria-live="polite"></pre>
+  <h3>Reduced 2-SAT Clauses:</h3>
+  <textarea id="reduced2sat" readonly></textarea>
+</section>
+
+<!-- 2-SAT Solver -->
+<section id="solve2sat">
+  <h2>2-SAT Solver</h2>
+  <textarea id="input2sat" placeholder="Enter 2-SAT clauses, one per line. Example:&#10;x1 !x2&#10;!x1 x2"></textarea><br/>
+  <button onclick="solve2sat()">Solve 2-SAT</button>
+  <h3>Solver Logs:</h3>
+  <pre id="solve2satLogs" aria-live="polite"></pre>
+  <h3>Assignment Result (JSON):</h3>
+  <pre id="solve2satResult"></pre>
+<button onclick="pipe2satToTseitin()">Send 2-SAT → Tseitin Clause Engine</button>
+</section>
+
+<!-- CNF Clause Matrix & Implication Graph Visualizer -->
+<section id="visualizer">
+  <h2>CNF Clause Matrix & Implication Graph Visualizer</h2>
+  <p>Click the button below to visualize the 2-SAT input clauses as a clause-literal matrix and an implication graph.</p>
+  <button onclick="visualizeCNFandGraph()">Visualize 2-SAT Input</button>
+  <h3>CNF Clause Matrix</h3>
+  <div id="cnfMatrix" aria-label="CNF clause matrix visualization"></div>
+  <h3>Implication Graph</h3>
+  <div id="implicationGraph" aria-label="Implication graph visualization"></div>
+</section>
+<!-- Add this new section below your 2-SAT Solver -->
+
+<section id="unitClauseExtractor">
+  <h2>Unit Clause Extractor (1-SAT Mode)</h2>
+  <p>Extracts unit clauses from the 2-SAT assignment and sends them to Tseitin Clause Engine.</p>
+  <button onclick="extractUnitClauses()">Extract Unit Clauses from 2-SAT Result</button>
+  <h3>Extracted Unit Clauses:</h3>
+  <pre id="unitClausesOutput"></pre>
+  <button onclick="sendUnitsToTseitin()">Send Unit Clauses → Tseitin Clause Engine</button>
+</section>
+
+<script>
+  // Extract literals assigned true or false in 2-SAT solution as unit clauses
+  function extractUnitClauses() {
+    const solve2satResult = document.getElementById('solve2satResult').textContent.trim();
+    if (!solve2satResult) {
+      alert("No 2-SAT assignment found. Please solve 2-SAT first.");
+      return;
+    }
+    let assignment;
+    try {
+      assignment = JSON.parse(solve2satResult);
+    } catch {
+      alert("Invalid 2-SAT assignment JSON.");
+      return;
+    }
+
+    // Extract unit clauses from assignment:
+    // A literal assigned true: "x" → unit clause: x
+    // A literal assigned false: "!x" → unit clause: !x
+    // But be careful to avoid duplicates; prefer only positive literals assigned true or negative literals assigned true as unit clauses.
+    // We'll output unit clauses as single literals per line, e.g. "x1" or "!x2"
+    const unitClausesSet = new Set();
+
+    for (const [lit, val] of Object.entries(assignment)) {
+      if (val === true) {
+        unitClausesSet.add(lit);
+      }
+    }
+
+    const unitClauses = Array.from(unitClausesSet);
+
+    const output = unitClauses.join('\n');
+    document.getElementById('unitClausesOutput').textContent = output;
+
+    // Also cache for sending to Tseitin input
+    window.cachedUnitClauses = output;
+  }
+
+  // Send extracted unit clauses to Tseitin Clause Engine input textarea
+  function sendUnitsToTseitin() {
+    if (!window.cachedUnitClauses) {
+      alert("No unit clauses extracted yet. Please run extraction first.");
+      return;
+    }
+    document.getElementById('tseitin-clauses-input').value = window.cachedUnitClauses;
+  }
+</script>
+
+<!-- Tseitin Clause Engine (Stepwise Reduction) -->
+<section id="tseitin-clause-engine">
+  <h2>Tseitin Clause Engine (Stepwise Reduction)</h2>
+  <p>Enter clauses (one clause per line, literals space-separated)</p>
+<textarea id="tseitin-clauses-input" rows="6" cols="60" placeholder="Enter clauses, one per line. Example:&#10;x1 x2 x3&#10;!x1 x2 x4"></textarea><br/>
+  <button id="reduce-clauses-btn">Reduce Clauses</button>
+
+  <h3>Final Transformed Clauses:</h3>
+  <pre id="tseitin-final-clauses"></pre>
+
+  <h3>Reduction Steps:</h3>
+  <pre id="tseitin-reduction-steps"></pre>
+</section>
+
+<!-- Horn-SAT Solver -->
+<section id="solvehorn">
+  <h2>Horn-SAT Solver</h2>
+  <textarea id="inputhornsat" placeholder="Enter Horn-SAT clauses, one per line. Example:&#10;!x1 x2&#10;!x2 x3"></textarea><br/>
+  <button onclick="solveHorn()">Solve Horn-SAT</button>
+  <h3>Horn-SAT Logs:</h3>
+  <pre id="hornSatLogs" aria-live="polite"></pre>
+  <h3>Horn-SAT Assignment (JSON):</h3>
+  <pre id="hornSatResult"></pre>
+</section>
+
+<!-- SMT Solver -->
+<section id="smt">
+  <h2>SMT Solver (Z3 Python API)</h2>
+  <textarea id="inputSMT" style="height: 120px;" aria-label="SMT-LIB input commands">
+(declare-const x Int)
+(assert (> x 5))
+(assert (< x 10))
+(check-sat)
+(get-model)
+  </textarea><br/>
+  <button onclick="solveSMT()">Solve SMT</button>
+  <h3>SMT Logs:</h3>
+  <pre id="smtLogs" aria-live="polite"></pre>
+  <h3>SMT Result (JSON):</h3>
+  <pre id="smtResult"></pre>
+</section>
+
+<!-- Collatz Solver -->
+<section id="collatz">
+  <h2>Collatz Solver</h2>
+  <input type="number" id="inputCollatz" value="10" min="10" aria-label="Input integer for Collatz solver" /><br/>
+  <button onclick="solveCollatz()">Solve Collatz</button>
+  <h3>Collatz Result:</h3>
+  <pre id="collatzResult"></pre>
+</section>
+
+<!-- Collatz Induction (Experimental) -->
+<section id="collatzInduction">
+  <h2>Collatz Induction (Experimental)</h2>
+  <p>Check if Collatz reaches 1 within a bounded number of steps using Z3 SMT.</p>
+  <label>Start value (n ≥ 10):</label>
+  <input type="number" id="inputCollatzBoundedN" value="17" min="10" />
+  <label>Max steps (k ≥ 1):</label>
+  <input type="number" id="inputCollatzBoundedK" value="5" min="1" />
+  <br />
+  <button onclick="solveCollatzBounded()">Run Bounded Check</button>
+  <h3>Result:</h3>
+  <pre id="collatzBoundedResult"></pre>
+</section>
+
+<!-- Goldbach Conjecture SMT Solver -->
+<section id="goldbach">
+  <h2>Goldbach Conjecture SMT Solver</h2>
+  <input type="number" id="inputGoldbach" value="4" min="4" step="2" aria-label="Input even integer for Goldbach conjecture solver" /><br/>
+  <button onclick="solveGoldbach()">Solve Goldbach</button>
+  <h3>Goldbach SMT Logs:</h3>
+  <pre id="goldbachLogs" aria-live="polite"></pre>
+  <h3>Result (Primes p1 + p2 = n):</h3>
+  <pre id="goldbachResult"></pre>
+</section>
+<button onclick="window.location.href='/tylers_theory'">Go to Tyler's Theory SAT Solver →</button>
+
+<script>
+  // ------------------------------
+  // Utility function: Show error or info messages in <pre> with ARIA live region
+  function showMessage(id, message) {
+    document.getElementById(id).textContent = message;
+  }
+
+  // ------------------------------
+  // 3-SAT to 2-SAT reducer
+  async function reduce3sat() {
+    const input = document.getElementById('input3sat').value.trim().split('\n').filter(l => l.trim());
+    if (input.length === 0) {
+      alert("Please enter at least one 3-SAT clause.");
+      return;
+    }
+    showMessage('reduceLogs', 'Processing reduction...');
+    showMessage('reduced2sat', '');
+
+    try {
+      const res = await fetch('/reduce_3sat', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({clauses: input})
+      });
+      const data = await res.json();
+
+      showMessage('reduceLogs', data.logs.join('\n'));
+      document.getElementById('reduced2sat').value = data.reduced_clauses.join('\n');
+      document.getElementById('input2sat').value = data.reduced_clauses.join('\n');
+    } catch (err) {
+      showMessage('reduceLogs', 'Error during reduction: ' + err.message);
+    }
+  }
+
+  // ------------------------------
+  // 2-SAT Solver
+  async function solve2sat() {
+    const input = document.getElementById('input2sat').value.trim().split('\n').filter(l => l.trim());
+    if (input.length === 0) {
+      alert("Please enter at least one 2-SAT clause.");
+      return;
+    }
+    showMessage('solve2satLogs', 'Solving 2-SAT...');
+    showMessage('solve2satResult', '');
+
+    try {
+      const res = await fetch('/solve_2sat', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({clauses: input})
+      });
+      if (res.status !== 200) {
+        const err = await res.json();
+        showMessage('solve2satLogs', err.logs.join('\n'));
+        showMessage('solve2satResult', err.error);
+        return;
+      }
+      const data = await res.json();
+      showMessage('solve2satLogs', data.logs.join('\n'));
+      showMessage('solve2satResult', JSON.stringify(data.assignment, null, 2));
+    } catch (err) {
+      showMessage('solve2satLogs', 'Error during solving: ' + err.message);
+    }
+  }
+
+  // ------------------------------
+  // Horn-SAT Solver
+  async function solveHorn() {
+    const input = document.getElementById('inputhornsat').value.trim().split('\n').filter(l => l.trim());
+    if (input.length === 0) {
+      alert("Please enter at least one Horn-SAT clause.");
+      return;
+    }
+    showMessage('hornSatLogs', 'Solving Horn-SAT...');
+    showMessage('hornSatResult', '');
+
+    try {
+      const res = await fetch('/solve_horn', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({clauses: input})
+      });
+      const data = await res.json();
+      showMessage('hornSatLogs', data.logs.join('\n'));
+      showMessage('hornSatResult', JSON.stringify(data.assignment, null, 2));
+    } catch (err) {
+      showMessage('hornSatLogs', 'Error during solving: ' + err.message);
+    }
+  }
+
+  // ------------------------------
+  // Tseitin Transform
+  async function tseitinTransform() {
+    const expr = document.getElementById('inputTseitin').value.trim();
+    if (!expr) {
+      alert("Please enter a logic expression.");
+      return;
+    }
+    showMessage('tseitinLogs', 'Performing Tseitin transform...');
+    showMessage('tseitinClauses', '');
+    showMessage('tseitinAuxVars', '');
+    showMessage('logicTree', '');
+
+    try {
+      const res = await fetch('/tseitin_transform', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({expr})
+      });
+      const data = await res.json();
+
+      showMessage('tseitinClauses', data.clauses.join('\n'));
+      showMessage('tseitinAuxVars', data.aux_vars.join(', '));
+      showMessage('tseitinLogs', data.logs.join('\n'));
+      showMessage('logicTree', JSON.stringify(data.logic_tree, null, 2));
+    } catch (err) {
+      showMessage('tseitinLogs', 'Error: ' + err.message);
+    }
+  }
+
+  // ------------------------------
+  // SMT Solver
+  async function solveSMT() {
+    const commands = document.getElementById('inputSMT').value.trim();
+    if (!commands) {
+      alert("Please enter SMT-LIB commands.");
+      return;
+    }
+    showMessage('smtLogs', 'Running SMT solver...');
+    showMessage('smtResult', '');
+
+    try {
+      const res = await fetch('/solve_smt', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({commands})
+      });
+      const data = await res.json();
+      if (res.status !== 200) {
+        showMessage('smtLogs', data.logs || 'Error');
+        showMessage('smtResult', data.error || '');
+        return;
+      }
+      showMessage('smtLogs', data.logs);
+      showMessage('smtResult', JSON.stringify(data.result, null, 2));
+    } catch (err) {
+      showMessage('smtLogs', 'Error during SMT solving: ' + err.message);
+    }
+  }
+
+  // ------------------------------
+  // Collatz Solver
+  async function solveCollatz() {
+    const n = parseInt(document.getElementById('inputCollatz').value, 10);
+    if (isNaN(n) || n < 10) {
+      alert("Please enter an integer ≥ 10.");
+      return;
+    }
+    showMessage('collatzResult', 'Computing Collatz sequence...');
+    try {
+      const res = await fetch('/solve_collatz', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({n})
+      });
+      const data = await res.json();
+      if(data.error) {
+        showMessage('collatzResult', data.error);
+      } else {
+        showMessage('collatzResult', JSON.stringify(data, null, 2));
+      }
+    } catch (err) {
+      showMessage('collatzResult', 'Error: ' + err.message);
+    }
+  }
+
+  // ------------------------------
+  // Goldbach Conjecture SMT Solver
+  async function solveGoldbach() {
+    const n = parseInt(document.getElementById('inputGoldbach').value, 10);
+    if (isNaN(n) || n < 4 || n % 2 !== 0) {
+      alert("Please enter an even integer ≥ 4.");
+      return;
+    }
+    showMessage('goldbachLogs', 'Solving Goldbach conjecture...');
+    showMessage('goldbachResult', '');
+
+    try {
+      const res = await fetch('/solve_goldbach', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({n})
+      });
+      const data = await res.json();
+      showMessage('goldbachLogs', data.logs.join('\n'));
+      if(data.error) {
+        showMessage('goldbachResult', data.error);
+      } else {
+        showMessage('goldbachResult', JSON.stringify({p1: data.p1, p2: data.p2}, null, 2));
+      }
+    } catch (err) {
+      showMessage('goldbachLogs', 'Error: ' + err.message);
+    }
+  }
+
+  // ------------------------------
+  // Visualizer: CNF Clause Matrix & Implication Graph for 2-SAT
+  async function visualizeCNFandGraph() {
+    const clauses = document.getElementById('input2sat').value.trim().split('\n').filter(l => l.trim());
+    if (clauses.length === 0) {
+      alert("Please enter 2-SAT clauses in the input box above.");
+      return;
+    }
+    try {
+      const res = await fetch('/get_implication_graph', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({clauses})
+      });
+      const data = await res.json();
+      buildCNFMatrix(clauses, data.variables);
+      buildImplicationGraph(data.implication_graph);
+    } catch (err) {
+      alert("Error fetching implication graph: " + err.message);
+    }
+  }
+
+  // Builds a clause x literals matrix, marking literals in each clause
+  function buildCNFMatrix(clauses, variables) {
+    const container = document.getElementById('cnfMatrix');
+    container.innerHTML = '';
+
+    // Prepare literals: variable and negated variable
+    const literals = [];
+    variables.forEach(v => {
+      literals.push(v);
+      literals.push('!' + v);
+    });
+
+    const table = document.createElement('table');
+
+    // Header row with literals
+    const headerRow = document.createElement('tr');
+    headerRow.appendChild(createCell('', 'th')); // empty top-left cell
+    literals.forEach(lit => {
+      headerRow.appendChild(createCell(lit, 'th'));
+    });
+    table.appendChild(headerRow);
+
+    // Each clause row
+    clauses.forEach((clause, i) => {
+      const tr = document.createElement('tr');
+
+      // Clause label cell
+      tr.appendChild(createCell(`Clause ${i}`, 'td', 'clause-label'));
+
+      const clauseLiterals = clause.split(' ');
+
+      literals.forEach(lit => {
+        const hasLit = clauseLiterals.includes(lit);
+        const td = createCell(hasLit ? '✔️' : '', 'td', hasLit ? 'checked' : '');
+        tr.appendChild(td);
+      });
+      table.appendChild(tr);
+    });
+
+    container.appendChild(table);
+  }
+
+  // Helper: create table cell
+  function createCell(text, tagName='td', className='') {
+    const cell = document.createElement(tagName);
+    cell.textContent = text;
+    if(className) cell.className = className;
+    return cell;
+  }
+
+  // Builds the implication graph visualization using vis-network
+  function buildImplicationGraph(graphData) {
+    const container = document.getElementById('implicationGraph');
+    container.innerHTML = '';
+
+    // Collect all unique nodes (literals)
+    const nodesSet = new Set();
+    Object.entries(graphData).forEach(([from, tos]) => {
+      nodesSet.add(from);
+      tos.forEach(to => nodesSet.add(to));
+    });
+
+    // Map to nodes array for vis-network
+    const nodes = Array.from(nodesSet).map(lit => ({
+      id: lit,
+      label: lit,
+      shape: 'ellipse',
+      color: '#97c2fc',
+      font: {size: 16}
+    }));
+
+    // Edges array for vis-network
+    const edges = [];
+    Object.entries(graphData).forEach(([from, tos]) => {
+      tos.forEach(to => {
+        edges.push({from, to, arrows: 'to', color: '#848484', smooth: true});
+      });
+    });
+
+    // Create network
+    const data = {
+      nodes: new vis.DataSet(nodes),
+      edges: new vis.DataSet(edges)
+    };
+
+    const options = {
+      layout: { hierarchical: false },
+      physics: {
+        enabled: true,
+        stabilization: { iterations: 200 }
+      },
+      interaction: {
+        hover: true,
+        navigationButtons: true,
+        keyboard: true
+      },
+      nodes: {
+        borderWidth: 1
+      },
+      edges: {
+        arrows: { to: { enabled: true, scaleFactor: 1 } }
+      }
+    };
+
+    new vis.Network(container, data, options);
+  }
+// Collatz Induction Bounded Solver
+async function solveCollatzBounded() {
+  const n = parseInt(document.getElementById('inputCollatzBoundedN').value, 10);
+  const k = parseInt(document.getElementById('inputCollatzBoundedK').value, 10);
+
+  if (isNaN(n) || isNaN(k) || n < 10 || k < 1) {
+    alert("Please enter valid values for n (≥10) and k (≥1).");
+    return;
+  }
+
+  const output = document.getElementById('collatzBoundedResult');
+  output.textContent = "Running...";
+
+  try {
+    const res = await fetch('/collatz_bounded', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ n, k })
+    });
+    const data = await res.json();
+    if (data.error) {
+      output.textContent = "Error: " + data.error;
+    } else {
+      output.textContent = JSON.stringify(data, null, 2);
+    }
+  } catch (err) {
+    output.textContent = "Exception: " + err.message;
+  }
+}
+
+
+document.getElementById('reduce-clauses-btn').addEventListener('click', async () => {
+  const inputText = document.getElementById('tseitin-clauses-input').value.trim();
+  const clauses = inputText.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+
+  const response = await fetch('/tseitin_clause_engine', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ clauses })
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    alert('Error: ' + error);
+    return;
+  }
+
+  const data = await response.json();
+  document.getElementById('tseitin-final-clauses').textContent = data.final_clauses.join('\n');
+  document.getElementById('tseitin-reduction-steps').textContent = data.steps.join('\n');
+});
+function pipe2satToTseitin() {
+  const lines = document.getElementById('input2sat').value.trim().split('\n').filter(Boolean);
+  document.getElementById('tseitin-clauses-input').value = lines.join('\n');
+}
+
+</script>
+
+
+</body>
+</html>
+
+
+
+
+
