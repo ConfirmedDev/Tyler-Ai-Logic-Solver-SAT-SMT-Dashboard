@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify, render_template_string
+from flask_cors import CORS
 
 from collections import defaultdict, deque
 import re
@@ -7,6 +8,7 @@ import json
 from z3 import *
 
 app = Flask(__name__)
+CORS(app)  # <-- allow cross-origin requests from React dev server
 
 # -------------------------------
 # Helper: Parse literals (with negation)
