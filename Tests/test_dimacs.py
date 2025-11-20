@@ -2,7 +2,7 @@ import requests
 import os
 
 # Auto switch between local and Render depending on environment
-BASE_URL = os.environ.get("SAT_BACKEND_URL", "http://127.0.0.1:5000")
+BASE_URL = os.environ.get("https://tyler-ai-logic-solver-sat-smt-dashboard.onrender.com", "http://127.0.0.1:5000")
 
 print("Using backend:", BASE_URL)
 
@@ -78,7 +78,7 @@ def main():
         test_collatz_2sat_reducer(reduced)
 
     # Test 3: Run benchmark on DIMACS file (adjust file path here)
-    dimacs_file_path = r"C:\Users\texau\Downloads\aim\aim-50-1_6-no-4.cnf"  # Change to your actual file path
+    dimacs_file_path = r"C:\aim-50-1_6-no-4.cnf"  # Change to your actual file path
     test_run_tyler_benchmark(dimacs_file_path)
 
 # -------------------------------
