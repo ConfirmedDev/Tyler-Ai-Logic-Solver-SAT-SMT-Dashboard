@@ -1,7 +1,10 @@
 import requests
 import os
 
-BASE_URL = "http://127.0.0.1:5000"
+# Auto switch between local and Render depending on environment
+BASE_URL = os.environ.get("SAT_BACKEND_URL", "http://127.0.0.1:5000")
+
+print("Using backend:", BASE_URL)
 
 def test_collatz_clause_reducer():
     print("Testing /collatz_clause_reducer...")
