@@ -1,9 +1,9 @@
 import React, { useRef, useState } from "react";
 
-const SIGNALING_URL =
-  import.meta.env.VITE_SIGNALING_URL || "ws://localhost:4000"; // Node signaling
-const FLASK_URL =
-  import.meta.env.VITE_BACKEND_URL || "http://127.0.0.1:5000"; // Your backend
+// use your actual Render URLs here
+const SIGNALING_URL = "wss://tyler-p2p-signaling.onrender.com"; 
+const FLASK_URL = "https://tyler-ai-logic-solver-sat-smt-dashboard.onrender.com";
+
 
 type CollatzState = {
   roomId: string;
