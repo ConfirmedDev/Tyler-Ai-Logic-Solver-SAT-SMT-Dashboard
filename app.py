@@ -5,6 +5,7 @@ from collections import defaultdict, deque
 import re
 import time
 import json
+import os
 from z3 import *
 
 app = Flask(__name__)
@@ -994,7 +995,9 @@ def index():
 
 # -------------------------------
 if __name__ == '__main__':
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=False)
+
 
 
 
