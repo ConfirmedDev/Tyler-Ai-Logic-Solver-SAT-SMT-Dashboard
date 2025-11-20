@@ -81,7 +81,10 @@ def main():
     dimacs_file_path = r"C:\Users\texau\Downloads\aim\aim-50-1_6-no-4.cnf"  # Change to your actual file path
     test_run_tyler_benchmark(dimacs_file_path)
 
-if __name__ == "__main__":
-    main()
+# -------------------------------
+if __name__ == '__main__':
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=False)
+
 
 
