@@ -4,6 +4,23 @@ An interactive symbolic reasoning platform built from the ground up using Python
 
 ---
 
+## Live P2P SAT Demo
+
+- Backend (Flask + Z3 + Collatz/2-SAT):  
+  https://tyler-ai-logic-solver-sat-smt-dashboard.onrender.com
+
+- P2P SAT Dashboard (React + WebRTC + signaling):  
+  https://tyler-p2p-sat-solver-dashboard.onrender.com
+
+How to use:
+1. Open the P2P dashboard in two browsers.
+2. Enter the same Room ID, click “Connect” on both.
+3. Type 3-SAT clauses in one window.
+4. Click “Run Collatz → 2-SAT → Check”.
+5. Both peers see the same reduced clauses, logs, and SAT/UNSAT result.
+
+---
+
 ## 🚀 Features
 
 - 🔁 **3-SAT → 2-SAT Clause Reduction**  
