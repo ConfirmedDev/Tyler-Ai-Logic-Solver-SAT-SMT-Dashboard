@@ -1,8 +1,8 @@
 import { useRef, useState } from "react";
 
-// use your actual Render URLs here
-const SIGNALING_URL = "wss://tyler-p2p-signaling.onrender.com"; 
-const FLASK_URL = "https://tyler-ai-logic-solver-sat-smt-dashboard.onrender.com";
+// For production on Render:
+const SIGNALING_URL = "wss://tyler-ai-logic-solver-sat-smt-dashboard-1.onrender.com";
+const FLASK_URL     = "https://tyler-ai-logic-solver-sat-smt-dashboard.onrender.com";
 
 
 type CollatzState = {
