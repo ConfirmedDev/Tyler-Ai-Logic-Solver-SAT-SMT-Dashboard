@@ -3,19 +3,17 @@ import os
 
 BASE_URL = "http://127.0.0.1:5000"
 
-def test_collatz_clause_reducer():
+def test_collatz_clause_reducer(clauses=None):
     print("Testing /collatz_clause_reducer...")
-
-    sample_clauses = [
-        "x1 !x2 x3",
-        "!x1 x2 !x3",
-        "x2 !x4 x5",
-        "x1 !x3"  # 2-literal clause should be preserved
-    ]
-
-    payload = {"clauses": sample_clauses}
+    if clauses is None:
+        clauses = [
+            "x1 !x2 x3",
+            "!x1 x2 !x3",
+            "x2 !x4 x5",
+            "x1 !x3"  # 2-literal clause should be preserved
+        ]
+    payload = {"clauses": clauses}
     response = requests.post(f"{BASE_URL}/collatz_clause_reducer", json=payload)
-
     if response.status_code == 200:
         data = response.json()
         print("\nReducer Logs:")
@@ -29,10 +27,8 @@ def test_collatz_clause_reducer():
 
 def test_collatz_2sat_reducer(reduced_clauses):
     print("\nTesting /collatz_2sat_reducer...")
-
     payload = {"clauses": reduced_clauses}
     response = requests.post(f"{BASE_URL}/collatz_2sat_reducer", json=payload)
-
     if response.status_code == 200:
         data = response.json()
         print("\n2-SAT Logs:")
@@ -43,14 +39,11 @@ def test_collatz_2sat_reducer(reduced_clauses):
 
 def test_run_tyler_benchmark(file_path):
     print("\nTesting /run_tyler_benchmark...")
-
     if not os.path.exists(file_path):
         print(f"File not found: {file_path}")
         return
-
     payload = {"file_path": file_path}
     response = requests.post(f"{BASE_URL}/run_tyler_benchmark", json=payload)
-
     if response.status_code == 200:
         data = response.json()
         print(f"\nFile: {data.get('file')}")
@@ -66,17 +59,44 @@ def test_run_tyler_benchmark(file_path):
     else:
         print("Error:", response.text)
 
-def main():
-    # Test 1: Collatz Clause Reducer
-    reduced = test_collatz_clause_reducer()
+# --- Edge-case SAT/UNSAT tests ---
+def test_edge_cases():
+    print("\n=== Running SAT/UNSAT Edge Cases ===")
 
-    # Test 2: Collatz 2-SAT Reducer using output of Test 1
+    # SAT example
+    sat_clauses = [
+        "x1 !x2 x3",
+        "!x1 x2 !x3",
+        "x2 !x4 x5"
+    ]
+    print("\n--- SAT Example ---")
+    reduced = test_collatz_clause_reducer(sat_clauses)
     if reduced:
         test_collatz_2sat_reducer(reduced)
 
+    # UNSAT example (4 clauses, 3 variables)
+    unsat_clauses = [
+        "x1 x2 x3",
+        "!x1 !x2 x3",
+        "x1 !x2 !x3",
+        "!x1 x2 !x3"
+    ]
+    print("\n--- UNSAT Example ---")
+    reduced_unsat = test_collatz_clause_reducer(unsat_clauses)
+    if reduced_unsat:
+        test_collatz_2sat_reducer(reduced_unsat)
+
+def main():
+    # Test 1: Collatz Clause Reducer
+    reduced = test_collatz_clause_reducer()
+    # Test 2: Collatz 2-SAT Reducer using output of Test 1
+    if reduced:
+        test_collatz_2sat_reducer(reduced)
     # Test 3: Run benchmark on DIMACS file (adjust file path here)
     dimacs_file_path = r"C:\Users\texau\Downloads\aim\aim-50-1_6-no-4.cnf"  # Change to your actual file path
     test_run_tyler_benchmark(dimacs_file_path)
+    # Test 4: Run edge-case SAT/UNSAT formulas
+    test_edge_cases()
 
 if __name__ == "__main__":
     main()
